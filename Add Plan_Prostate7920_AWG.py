@@ -8,9 +8,20 @@
 
 from connect import *
 
+
+
+
 ############################################################
+# IMPORT ENVIRONMENT VARIABLES
 #
-#
+
+
+patient = get_current("Patient")
+
+examination = get_current("Examination")
+
+db = get_current("PatientDB")
+
 
 
 ############################################################
@@ -23,52 +34,20 @@ from connect import *
 # verify that isocenter POI does not already exist
 
 
+# set the CT name
 
-
-############################################################
-# IMPORT ENVIRONMENT VARIABLES
-#
-print "going to try to import environment variables"
-
-try:
-  print "trying to get Patient"
-  patient = get_current("Patient")
-except:
-  print "had a problem loading the patient"
-
-try:
-  print "trying to get BeamSet"
-  beam_set = get_current("BeamSet")
-except:
-  print "had a problem loading the BeamSet"
-
-try:
-  print "trying to get Examination"
-  examination = get_current("Examination")
-except:
-  print "had a problem loading the Examination"
-
-try:
-  print "trying to get PatientDB"
-  db = get_current("PatientDB")
-except:
-  print "had a problem loading the PatientDB"
-
-print "got the environment variables"
-
+examination.EquipmentInfo.SetImagingSystemReference(ImagingSystemName="120kVpSEAPBS13")
 
 ############################################################
 # CREATE THE "Prostate7920" PLAN
 #
-print "going to try adding a new plan"
-print examination.Name
+
 Prostate7920Plan = patient.AddNewPlan(
 					PlanName="Prostate7920",
 					PlannedBy="",
 					Comment="",
 					ExaminationName=examination.Name,
 					AllowDuplicateNames=False)
-print "made it past the attempt to add a new plan"
 
 # Set the dose grid size
 Prostate7920Plan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.3, 'y': 0.3, 'z': 0.3 })
@@ -156,20 +135,19 @@ MyNewBeam2 = Prostate7920BeamSet.CreatePbsIonBeam(
 #-----------------------------------
 
 
-MyDRRPlan = patient.AddNewPlan(
+DRRPlan = patient.AddNewPlan(
 					PlanName="DRRs",
 					PlannedBy="",
 					Comment="",
 					ExaminationName=examination.Name,
 					AllowDuplicateNames=False)
 
-print "made it past the attempt to add a new plan"
 
 # Set the dose grid size
-MyDRRPlan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.3, 'y': 0.3, 'z': 0.3 })
+DRRPlan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.5, 'y': 0.5, 'z': 0.5 })
 
 
-MyDRRBeamSet = MyDRRPlan.AddNewBeamSet(
+DRRBeamSet = DRRPlan.AddNewBeamSet(
 					Name="Prostate7920",
 					ExaminationName=examination.Name,
 					MachineName="FBTR1_test",
@@ -182,7 +160,7 @@ MyDRRBeamSet = MyDRRPlan.AddNewBeamSet(
 					UseLocalizationPointAsSetupIsocenter=False,
 					Comment="")
 
-MyDRRBeamSet.AddDosePrescriptionToRoi(
+DRRBeamSet.AddDosePrescriptionToRoi(
 					RoiName="CTV",
 					DoseVolume=100,
 					PrescriptionType="DoseAtVolume",
@@ -191,7 +169,7 @@ MyDRRBeamSet.AddDosePrescriptionToRoi(
 					AutoScaleDose=False)
 
 # Create Beam 80 (RL SETUP)
-DRRbeam80 = MyDRRBeamSet.CreatePbsIonBeam(
+DRRbeam80 = DRRBeamSet.CreatePbsIonBeam(
 					SnoutId="25",
 					SpotTuneId="4.0",
 					RangeShifter="25RS-00",
@@ -206,15 +184,11 @@ DRRbeam80 = MyDRRBeamSet.CreatePbsIonBeam(
 
 # reset beam number to beam 80
 # RayStation will count upwards from 80, so no need to renumber subsequent beams
-print "going to try to set the beam number"
-try:
-	DRRbeam80.Number = 80
-	print "no errors after setting the beam number of beam 80"
-except:
-	print "could not set the beam number of beam 80"
+
+DRRbeam80.Number = 80
 
 # Create Beam 81 (PA SETUP R)
-DRRbeam81 = MyDRRBeamSet.CreatePbsIonBeam(
+DRRbeam81 = DRRBeamSet.CreatePbsIonBeam(
 					SnoutId="25",
 					SpotTuneId="4.0",
 					RangeShifter="25RS-00",
@@ -228,7 +202,7 @@ DRRbeam81 = MyDRRBeamSet.CreatePbsIonBeam(
 					ApertureBlock=None)
 
 # Create Beam 82 (LL SETUP)
-DRRbeam82 = MyDRRBeamSet.CreatePbsIonBeam(
+DRRbeam82 = DRRBeamSet.CreatePbsIonBeam(
 					SnoutId="25",
 					SpotTuneId="4.0",
 					RangeShifter="25RS-00",
@@ -242,7 +216,7 @@ DRRbeam82 = MyDRRBeamSet.CreatePbsIonBeam(
 					ApertureBlock=None)
 
 # Create Beam 83 (PA SETUP L)
-DRRbeam83 = MyDRRBeamSet.CreatePbsIonBeam(
+DRRbeam83 = DRRBeamSet.CreatePbsIonBeam(
 					SnoutId="25",
 					SpotTuneId="4.0",
 					RangeShifter="25RS-00",
@@ -257,14 +231,13 @@ DRRbeam83 = MyDRRBeamSet.CreatePbsIonBeam(
 
 # can this be done by using the template?
 
-#figure out how to optimize
 
 
 
 
 
 ############################################################
-# Load Clinical Goals: Standard Prostate Low_Risk
+# Load Clinical Goals Template: Standard Prostate Low_Risk
 #
 
 Prostate7920Plan.TreatmentCourse.EvaluationSetup.ApplyClinicalGoalTemplate(
@@ -275,13 +248,14 @@ Prostate7920Plan.TreatmentCourse.EvaluationSetup.ApplyClinicalGoalTemplate(
 
 					
 ############################################################
-# Load Clinical Goals: Standard Prostate Low_Risk
-#
+# Load Objectives/Constaints Template: Standard Prostate Low_Risk
+#	Loads for both Prostate7920 and DRRPlan
 					
 Prostate7920Plan.PlanOptimizations[0].ApplyOptimizationTemplate(
-					Template=db.TemplateTreatmentOptimizations['Prsotate7920_AWG'])
+					Template=db.TemplateTreatmentOptimizations['Prostate7920_PBS Auto Plan'])
 
-					
+DRRPlan.PlanOptimizations[0].ApplyOptimizationTemplate(
+					Template=db.TemplateTreatmentOptimizations['Prostate7920_PBS Auto Plan'])					
 					
 					
 					
@@ -292,18 +266,47 @@ Prostate7920Plan.PlanOptimizations[0].ApplyOptimizationTemplate(
 					
 					
 ############################################################
-# Attempting to: Edit Beam Specific Target Margin
+# Edit Beam Specific Target Margin
 #
 
-# Unscriptable Action 'Edit beam optimization settings (1, Beam Set: Prostate7920)' Completed : EditIonBeamOptimizationSettingsAction(...)
 
-# Unscriptable Action 'Edit beam optimization settings (2, Beam Set: Prostate7920)' Completed : EditIonBeamOptimizationSettingsAction(...)
+# Plan Optimization > Settings > Optimization Settings > Optimization Tolerance
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.Algorithm.OptimalityTolerance = 1E-12
+
+# Plan Optimization > Settings > Optimization Settings > Max number of iterations
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.Algorithm.MaxNumberOfIterations = 100
+
+#Iterations before spot filtering
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningProperties.NumberOfIterationsBeforeSpotWeightBounding = 0
+
+#Spot limit margin %
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningProperties.SpotWeightLimitsMargin = 0.10
 
 
 
 
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.TreatmentSetupSettings[0].BeamSettings[0].LateralTargetMargin = 1
+
+Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.TreatmentSetupSettings[0].BeamSettings[1].LateralTargetMargin = 1
 
 
+Prostate7920Plan.PlanOptimizations[0].RunOptimization()
+
+Prostate7920BeamSet.NormalizeToPrescription(
+					RoiName="CTV",
+					DoseValue=7920,
+					DoseVolume=100,
+					PrescriptionType="DoseAtVolume",
+					LockedBeamNames=None,
+					EvaluateAfterScaling=True)
 
 
+# max iterations on DRR = 1
 
+#run optimization for DRRs
+
+DRRPlan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningProperties.NumberOfIterationsBeforeSpotWeightBounding = 0
+
+DRRPlan.PlanOptimizations[0].OptimizationParameters.Algorithm.MaxNumberOfIterations = 1
+
+DRRPlan.PlanOptimizations[0].RunOptimization()
