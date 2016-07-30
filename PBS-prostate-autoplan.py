@@ -7,6 +7,7 @@
 #   Selected patient: ...
 
 from connect import *
+from datetime import datetime
 
 
 
@@ -29,14 +30,34 @@ db = get_current("PatientDB")
 #
 
 # verify that CTV exists
+# verify that PTVEval exists
+#  - can this be template-specific?
 # verify that no plan named "Prostate7920" already exists
 # verify that no plan named "DRRs" already exists
 # verify that isocenter POI does not already exist
 
 
-# set the CT name
+# extract DateTime object that doesn't play nice
+seriesdateraw = examination.GetExaminationDateTime()
 
+# convert it to a string
+seriesdatestring = "{}".format(seriesdateraw)
+
+# parse the string back into a normal datetime object
+seriesdateproperdatetime = datetime.strptime(seriesdatestring, "%m/%d/%Y %H:%M:%S")
+
+# use the datetime string formatting tool to rearrange the parts
+reformatteddatestring = datetime.strftime(seriesdateproperdatetime,"%m%d%Y")
+
+# create a name with "RTPCT" on the front
+concatenatedname = "RTPCT{}".format(reformatteddatestring)
+
+# rename the examination
+examination.Name = concatenatedname
+
+#set the CT-ED table
 examination.EquipmentInfo.SetImagingSystemReference(ImagingSystemName="120kVpSEAPBS13")
+
 
 ############################################################
 # CREATE THE "Prostate7920" PLAN
@@ -130,9 +151,9 @@ MyNewBeam2 = Prostate7920BeamSet.CreatePbsIonBeam(
 
 
 
-#-----------------------------------
+#---------------------------------------------------------
 # Create DRR version of the plan
-#-----------------------------------
+#---------------------------------------------------------
 
 
 DRRPlan = patient.AddNewPlan(
@@ -258,18 +279,7 @@ DRRPlan.PlanOptimizations[0].ApplyOptimizationTemplate(
 					Template=db.TemplateTreatmentOptimizations['Prostate7920_PBS Auto Plan'])					
 					
 					
-					
-					
-					
-					
-					
-					
-					
-############################################################
-# Edit Beam Specific Target Margin
-#
-
-
+										
 # Plan Optimization > Settings > Optimization Settings > Optimization Tolerance
 Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.Algorithm.OptimalityTolerance = 1E-12
 
@@ -282,13 +292,13 @@ Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningP
 #Spot limit margin %
 Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningProperties.SpotWeightLimitsMargin = 0.10
 
-
-
+#Beam Specific Target Margin (cm)
 
 Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.TreatmentSetupSettings[0].BeamSettings[0].LateralTargetMargin = 1
 
 Prostate7920Plan.PlanOptimizations[0].OptimizationParameters.TreatmentSetupSettings[0].BeamSettings[1].LateralTargetMargin = 1
 
+#Optimize Prostate7920 and normalize CTV to 100%RX on completion
 
 Prostate7920Plan.PlanOptimizations[0].RunOptimization()
 
@@ -300,13 +310,39 @@ Prostate7920BeamSet.NormalizeToPrescription(
 					LockedBeamNames=None,
 					EvaluateAfterScaling=True)
 
-
 # max iterations on DRR = 1
-
-#run optimization for DRRs
 
 DRRPlan.PlanOptimizations[0].OptimizationParameters.PencilBeamScanningProperties.NumberOfIterationsBeforeSpotWeightBounding = 0
 
 DRRPlan.PlanOptimizations[0].OptimizationParameters.Algorithm.MaxNumberOfIterations = 1
 
+#run optimization for DRRs
+
 DRRPlan.PlanOptimizations[0].RunOptimization()
+
+
+
+############################################################
+# Run Standard Prostate Robustness Analysis
+#	+/- 3% density eval
+
+Prostate7920BeamSet.ComputePerturbedDose(
+					DensityPerturbation=0.03,
+					IsocenterShift={ 'x': 0, 'y': 0, 'z': 0 },
+					IsDoseConsideredClinical=False,
+					OnlyOneDosePerImageSet=False,
+					AllowGridExpansion=False,
+					ExaminationNames = [examination.Name],
+					FractionNumbers=[0],
+					ComputeBeamDoses=True)
+					
+Prostate7920BeamSet.ComputePerturbedDose(
+					DensityPerturbation=-0.03,
+					IsocenterShift={ 'x': 0, 'y': 0, 'z': 0 },
+					IsDoseConsideredClinical=False,
+					OnlyOneDosePerImageSet=False,
+					AllowGridExpansion=False,
+					ExaminationNames = [examination.Name],
+					FractionNumbers=[0],
+					ComputeBeamDoses=True)
+
