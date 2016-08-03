@@ -12,9 +12,9 @@ from datetime import datetime
 
 
 
-############################################################
+#---------------------------------------------------------
 # IMPORT ENVIRONMENT VARIABLES
-#
+#---------------------------------------------------------
 
 
 patient = get_current("Patient")
@@ -25,9 +25,9 @@ db = get_current("PatientDB")
 
 
 
-############################################################
+#---------------------------------------------------------
 # Pre-run error checking
-#
+#---------------------------------------------------------
 
 # verify that CTV exists
 # verify that PTVEval exists
@@ -37,31 +37,40 @@ db = get_current("PatientDB")
 # verify that isocenter POI does not already exist
 
 
-# extract DateTime object that doesn't play nice
-seriesdateraw = examination.GetExaminationDateTime()
 
-# convert it to a string
-seriesdatestring = "{}".format(seriesdateraw)
 
-# parse the string back into a normal datetime object
-seriesdateproperdatetime = datetime.strptime(seriesdatestring, "%m/%d/%Y %H:%M:%S")
+#---------------------------------------------------------
+# Set up CT parameters and density overrides
+#---------------------------------------------------------
 
-# use the datetime string formatting tool to rearrange the parts
-reformatteddatestring = datetime.strftime(seriesdateproperdatetime,"%m%d%Y")
+# set the name of the CT
+examination.Name = 'RTPCT' + datetime.strftime(datetime(examination.GetExaminationDateTime()), "%m%d%Y")
 
-# create a name with "RTPCT" on the front
-concatenatedname = "RTPCT{}".format(reformatteddatestring)
-
-# rename the examination
-examination.Name = concatenatedname
-
-#set the CT-ED table
+# set the CT-ED table
 examination.EquipmentInfo.SetImagingSystemReference(ImagingSystemName="120kVpSEAPBS13")
 
+# set overrides for selected ROIs
 
-############################################################
-# CREATE THE "Prostate7920" PLAN
+#for testROI in patient.PatientModel.RegionsOfInterest
+#	if testROI.Name == "Air_In_Rectum"
+#		print "I found Air_In_Rectum!!!!"
+#		ROI.SetRoiMaterial(Material = db.TemplateMaterials[0].Materials[25]) # Water
+#	if ROI.name == "Contrast_Bladder"
+#		ROI.SetRoiMaterial(Material = db.TemplateMaterials[0].Materials[25]) # Water
 #
+#	if ROI.name == "Override_Tissue"
+#		ROI.SetRoiMaterial(Material = db.TemplateMaterials[0].Materials[14]) # Muscle
+#	if ROI.name == "Contrast_Urethro"
+#		ROI.SetRoiMaterial(Material = db.TemplateMaterials[0].Materials[14]) # Muscle
+#	if ROI.name == "Contrast_Prostate"
+#		ROI.SetRoiMaterial(Material = db.TemplateMaterials[0].Materials[14]) # Muscle
+
+
+
+#---------------------------------------------------------
+# CREATE THE "Prostate7920" PLAN
+#---------------------------------------------------------
+
 
 Prostate7920Plan = patient.AddNewPlan(
 					PlanName="Prostate7920",
@@ -74,9 +83,11 @@ Prostate7920Plan = patient.AddNewPlan(
 Prostate7920Plan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.3, 'y': 0.3, 'z': 0.3 })
 
 
-############################################################
+
+#---------------------------------------------------------
 # EXTRACT AND SET ISOCENTER
-#
+#---------------------------------------------------------
+
 structure_set = Prostate7920Plan.GetStructureSet()
 
 CTVcentroid = structure_set.RoiGeometries["CTV"].GetCenterOfRoi()
@@ -93,9 +104,9 @@ CreateIsocenterPOI = patient.PatientModel.CreatePoi(
 
 
 
-############################################################
+#---------------------------------------------------------
 # CREATE A NEW BEAMSET
-#
+#---------------------------------------------------------
 Prostate7920BeamSet = Prostate7920Plan.AddNewBeamSet(
 					Name="Prostate7920",
 					ExaminationName=examination.Name,
@@ -120,9 +131,9 @@ Prostate7920BeamSet.AddDosePrescriptionToRoi(
 
 
 
-############################################################
+#---------------------------------------------------------
 # CREATE BEAMS
-#
+#---------------------------------------------------------
 MyNewBeam1 = Prostate7920BeamSet.CreatePbsIonBeam(
 					SnoutId="25",
 					SpotTuneId="4.0",
@@ -165,7 +176,7 @@ DRRPlan = patient.AddNewPlan(
 
 
 # Set the dose grid size
-DRRPlan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.5, 'y': 0.5, 'z': 0.5 })
+DRRPlan.SetDefaultDoseGrid(VoxelSize={ 'x': 0.3, 'y': 0.3, 'z': 0.3 })
 
 
 DRRBeamSet = DRRPlan.AddNewBeamSet(
@@ -257,9 +268,9 @@ DRRbeam83 = DRRBeamSet.CreatePbsIonBeam(
 
 
 
-############################################################
+#---------------------------------------------------------
 # Load Clinical Goals Template: Standard Prostate Low_Risk
-#
+#---------------------------------------------------------
 
 Prostate7920Plan.TreatmentCourse.EvaluationSetup.ApplyClinicalGoalTemplate(
 					Template=db.TemplateTreatmentOptimizations['Standard Prostate Low_Risk  '])
@@ -268,9 +279,10 @@ Prostate7920Plan.TreatmentCourse.EvaluationSetup.ApplyClinicalGoalTemplate(
 
 
 					
-############################################################
+#---------------------------------------------------------
 # Load Objectives/Constaints Template: Standard Prostate Low_Risk
 #	Loads for both Prostate7920 and DRRPlan
+#---------------------------------------------------------
 					
 Prostate7920Plan.PlanOptimizations[0].ApplyOptimizationTemplate(
 					Template=db.TemplateTreatmentOptimizations['Prostate7920_PBS Auto Plan'])
@@ -322,9 +334,10 @@ DRRPlan.PlanOptimizations[0].RunOptimization()
 
 
 
-############################################################
+#---------------------------------------------------------
 # Run Standard Prostate Robustness Analysis
 #	+/- 3% density eval
+#---------------------------------------------------------
 
 Prostate7920BeamSet.ComputePerturbedDose(
 					DensityPerturbation=0.03,
